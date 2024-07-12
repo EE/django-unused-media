@@ -19,17 +19,18 @@ except ImportError:
 
 tests_require = [
     'mock',
-    'nose',
     'coverage',
     'yanc',
     'preggy',
     'tox<2.0',
     'coveralls',
-    'django_nose',
     'pypandoc',
     'flake8',
     'isort',
-    'twine'
+    'twine',
+    'pytest',
+    'pytest-django',
+    'pytest-cov',
 ]
 
 setup(

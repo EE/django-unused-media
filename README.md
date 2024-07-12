@@ -92,6 +92,11 @@ To run tests:
 ```
 make test
 ```
+or just
+```
+pytest
+```
+
 To run static analyser:
 ```
 make flake8

@@ -19,7 +19,7 @@ setup:
 test: unit
 
 unit:
-	@coverage run ./tests/runtests.py -vv --with-yanc
+	@pytest --cov
 	@coverage report -m --fail-under=80
 
 # show coverage in html format
