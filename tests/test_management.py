@@ -2,9 +2,8 @@
 
 import mock
 import six
-
-from preggy import expect
 from django.core.management import call_command
+from preggy import expect
 
 from .base import BaseTestCase
 
@@ -55,7 +54,7 @@ class TestManagementCommand(BaseTestCase):
     def test_command_interactive_y_with_ascii(self, mock_input):
         self._media_create(u'Тест.txt')
 
-        expected_string = u'Remove {}'.format(self._media_abs_path(u'Тест.txt'))
+        expected_string = u'Remove {}'.format('Тест.txt')
         if six.PY2:
             expected_string = expected_string.encode('utf-8')
 

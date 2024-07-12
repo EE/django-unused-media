@@ -8,7 +8,7 @@
 # http://www.opensource.org/licenses/MIT-license
 # Copyright (c) 2015, Andrey Kolpakov <aakolpakov@gmail.com>
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 try:
     from pypandoc import convert

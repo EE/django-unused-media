@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import shutil
 import os
+import shutil
 import time
 
-from django.test import TestCase
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.test import TestCase
 
 
 class BaseTestCase(TestCase):

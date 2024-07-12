@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import os
 import re
 import time
 
-import six
-from django.conf import settings
+from django.core.files.storage import default_storage
 from django.core.validators import EMPTY_VALUES
 
 from .remove import remove_media
@@ -27,43 +25,51 @@ def get_used_media():
             '%s' % field.name: '',
         }
 
-        storage = field.storage
-
         for value in field.model._base_manager \
                 .values_list(field.name, flat=True) \
                 .exclude(**is_empty).exclude(**is_null):
             if value not in EMPTY_VALUES:
-                media.add(storage.path(value))
+                media.add(value)
 
     return media
 
 
 def get_all_media(exclude=None, minimum_file_age=None):
     """
-        Get all media from MEDIA_ROOT
+        Get all media entries from storage
     """
 
     if not exclude:
         exclude = []
 
-    media = set()
     initial_time = time.time()
+    return _get_media_recursive(default_storage, '', exclude, minimum_file_age, initial_time)
 
-    for root, dirs, files in os.walk(six.text_type(settings.MEDIA_ROOT)):
-        for name in files:
-            path = os.path.abspath(os.path.join(root, name))
-            relpath = os.path.relpath(path, settings.MEDIA_ROOT)
 
-            if minimum_file_age:
-                file_age = initial_time - os.path.getmtime(path)
-                if file_age < minimum_file_age:
-                    continue
+def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial_time):
+    directories, files = storage.listdir(prefix)
+    media = set()
 
-            for e in exclude:
-                if re.match(r'^%s$' % re.escape(e).replace('\\*', '.*'), relpath):
-                    break
-            else:
-                media.add(path)
+    for name in files:
+        name = prefix + name
+        for e in pathexclude:
+            if re.match(r'^%s$' % re.escape(e).replace('\\*', '.*'), name):
+                break
+        else:
+            media.add(name)
+
+        if minimum_file_age:
+            file_age = initial_time - storage.get_modified_time(name).timestamp()
+            if file_age < minimum_file_age:
+                media.remove(name)
+
+    for directory in directories:
+        directory = prefix + directory + '/'
+        for e in pathexclude:
+            if re.match(r'^%s$' % re.escape(e).replace('\\*', '.*'), directory):
+                break
+        else:
+            media |= _get_media_recursive(storage, directory, pathexclude, minimum_file_age, initial_time)
 
     return media
 
