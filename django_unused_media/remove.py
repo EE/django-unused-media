@@ -4,6 +4,7 @@ import logging
 import os
 
 from django.conf import settings
+from django.core.files.storage import default_storage
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ def remove_media(files):
     """
     for filename in files:
         logger.info('Removing %s', filename)
-        os.remove(os.path.join(settings.MEDIA_ROOT, filename))
+        default_storage.delete(filename)
 
 
 def remove_empty_dirs(path=None):
