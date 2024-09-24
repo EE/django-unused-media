@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import os
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 def remove_media(files):
@@ -10,6 +13,7 @@ def remove_media(files):
         Delete file from media dir
     """
     for filename in files:
+        logger.info('Removing %s', filename)
         os.remove(os.path.join(settings.MEDIA_ROOT, filename))
 
 
@@ -27,6 +31,7 @@ def remove_empty_dirs(path=None):
     listdir = [os.path.join(path, filename) for filename in os.listdir(path)]
 
     if all(list(map(remove_empty_dirs, listdir))):
+        logger.info('Removing empty dir %s', path)
         os.rmdir(path)
         return True
     else:

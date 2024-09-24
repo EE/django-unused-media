@@ -6,7 +6,6 @@ import time
 from django.core.files.storage import default_storage
 from django.core.validators import EMPTY_VALUES
 
-from .remove import remove_media
 from .utils import get_file_fields
 
 
@@ -86,10 +85,3 @@ def get_unused_media(exclude=None, minimum_file_age=None):
     used_media = get_used_media()
 
     return all_media - used_media
-
-
-def remove_unused_media():
-    """
-        Remove unused media
-    """
-    remove_media(get_unused_media())

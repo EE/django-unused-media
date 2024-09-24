@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import os
+import logging
 
 import six.moves
-from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from django_unused_media.cleanup import get_unused_media
-from django_unused_media.remove import remove_empty_dirs
+from django_unused_media.remove import remove_empty_dirs, remove_media
 
 
 class Command(BaseCommand):
@@ -74,6 +73,8 @@ class Command(BaseCommand):
         if 'verbosity' in options:
             self.verbosity = options['verbosity']
 
+        self._configure_logging()
+
         unused_media = get_unused_media(
             exclude=options.get('exclude'),
             minimum_file_age=options.get('minimum_file_age'),
@@ -99,11 +100,19 @@ class Command(BaseCommand):
                 self.info('Interrupted by user. Exit.')
                 return
 
-        for f in unused_media:
-            self.debug('Remove %s' % f)
-            os.remove(os.path.join(settings.MEDIA_ROOT, f))
+        remove_media(unused_media)
 
         if options.get('remove_empty_dirs'):
             remove_empty_dirs()
 
         self.info('Done. Total files removed: {}'.format(len(unused_media)))
+
+    def _configure_logging(self):
+        if self.verbosity == 0:
+            level = logging.ERROR
+        elif self.verbosity == 1:
+            level = logging.INFO
+        else:
+            level = logging.DEBUG
+        root_logger = logging.getLogger()
+        root_logger.setLevel(level)

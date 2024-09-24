@@ -52,16 +52,21 @@ class TestManagementCommand(BaseTestCase):
 
     @mock.patch('six.moves.input', return_value='Y')
     def test_command_interactive_y_with_ascii(self, mock_input):
-        self._media_create(u'Тест.txt')
-
-        expected_string = u'Remove {}'.format('Тест.txt')
-        if six.PY2:
-            expected_string = expected_string.encode('utf-8')
+        filename = 'Тест.txt'
+        self._media_create(filename)
 
         stdout = six.StringIO()
-        call_command('cleanup_unused_media', interactive=True, stdout=stdout, verbosity=2, minimum_file_age=0)
+        with mock.patch('logging.Logger.info') as mock_info:
+            call_command(
+                'cleanup_unused_media',
+                interactive=True, stdout=stdout,
+                verbosity=2, minimum_file_age=0,
+            )
+
+        mock_info.assert_called_once()
+        assert mock_info.call_args[0][1] == filename
+
         expect(stdout.getvalue().split('\n')) \
-            .to_include(expected_string) \
             .to_include(u'Done. Total files removed: 1')
 
         expect(self._media_exists(u'Тест.txt')).to_be_false()

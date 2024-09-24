@@ -3,12 +3,12 @@
 import mock
 import pytest
 import six
+from django.core.management import call_command
 from django.db import models
 from preggy import expect
 
 from django_unused_media.cleanup import (get_all_media, get_file_fields,
-                                         get_unused_media, get_used_media,
-                                         remove_unused_media)
+                                         get_unused_media, get_used_media)
 from django_unused_media.remove import remove_empty_dirs, remove_media
 
 from .base import BaseTestCase
@@ -173,13 +173,12 @@ class TestCleanup(BaseTestCase):
         expect(get_unused_media()).to_be_empty()
         self._media_create(u'notused.txt')
         expect(get_unused_media()).Not.to_be_empty()
-        remove_unused_media()
+        call_command('cleanup_unused_media', interactive=False, minimum_file_age=0)
         expect(get_unused_media()).to_be_empty()
 
     def test_remove_empty_dirs(self):
         self._media_create(u'sub1/sub2/sub3/notused.txt')
-        remove_unused_media()
-        remove_empty_dirs()
+        call_command('cleanup_unused_media', interactive=False, remove_empty_dirs=True, minimum_file_age=0)
         expect(self._media_exists(u'sub1/sub2/sub3/notused.txt')).to_be_false()
         expect(self._media_exists(u'sub1/sub2/sub3')).to_be_false()
         expect(self._media_exists(u'sub1/sub2')).to_be_false()
