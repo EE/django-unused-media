@@ -195,6 +195,9 @@ def get_all_media(exclude=None, minimum_file_age=None):
     return all_media
 
 
+REPORT_EVERY_N_FILES = 1000
+
+
 def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial_time):
     directories, files = storage.listdir(prefix)
     media = set()
@@ -212,13 +215,20 @@ def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial
             if file_age < minimum_file_age:
                 media.remove(name)
 
+        if len(media) % REPORT_EVERY_N_FILES == 0:
+            logger.info("Prefix %s has %d flat files so far", prefix, len(media))
+
     for directory in directories:
         directory = prefix + directory + '/'
         for e in pathexclude:
             if re.match(r'^%s$' % re.escape(e).replace('\\*', '.*'), directory):
                 break
         else:
+            len_before = len(media)
             media |= _get_media_recursive(storage, directory, pathexclude, minimum_file_age, initial_time)
+            len_after = len(media)
+            if len_after // REPORT_EVERY_N_FILES > len_before // REPORT_EVERY_N_FILES:
+                logger.info("Prefix %s has %d flat and nested files so far", directory, len_after)
 
     return media
 
