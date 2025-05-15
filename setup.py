@@ -12,10 +12,16 @@ from setuptools import find_packages, setup
 
 try:
     from pypandoc import convert
-    read_md = lambda f: convert(f, 'rst')
+
+    def read_md(f):
+        return convert(f, 'rst')
+
 except ImportError:
     print("warning: pypandoc module not found, could not convert Markdown to RST")
-    read_md = lambda f: open(f, 'r').read()
+
+    def read_md(f):
+        with open(f, 'r') as file:
+            return file.read()
 
 tests_require = [
     'mock',

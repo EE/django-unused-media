@@ -118,8 +118,21 @@ class Command(BaseCommand):
             level = logging.INFO
         else:
             level = logging.DEBUG
+
+        # Configure root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(level)
+
+        # Ensure we have a console handler for immediate feedback
+        if not root_logger.handlers:
+            console_handler = logging.StreamHandler(self.stdout)
+            console_handler.setLevel(level)
+            formatter = logging.Formatter('%(message)s')  # Simple format for console output
+            console_handler.setFormatter(formatter)
+            root_logger.addHandler(console_handler)
+
+        # Set our module logger level too
+        logger.setLevel(level)
 
 
 def get_used_media():
@@ -128,8 +141,13 @@ def get_used_media():
     """
 
     media = set()
+    total_refs = 0
 
-    for field in get_file_fields():
+    fields = get_file_fields()
+
+    logger.info("Starting to scan %d fields for media references", len(fields))
+
+    for field in fields:
         is_null = {
             '%s__isnull' % field.name: True,
         }
@@ -137,11 +155,24 @@ def get_used_media():
             '%s' % field.name: '',
         }
 
-        for value in field.model._base_manager \
-                .values_list(field.name, flat=True) \
-                .exclude(**is_empty).exclude(**is_null):
+        field_values = field.model._base_manager \
+            .values_list(field.name, flat=True) \
+            .exclude(**is_empty).exclude(**is_null)
+
+        field_refs = 0
+        for value in field_values:
             if value not in EMPTY_VALUES:
                 media.add(value)
+                field_refs += 1
+                total_refs += 1
+
+        logger.info(
+            "Scanning %s.%s.%s... got %d media refs, total media refs now is %d",
+            field.model._meta.app_label, field.model._meta.model_name,
+            field.name, field_refs, total_refs,
+        )
+
+    logger.info("Finished scanning. Found %d unique media references", len(media))
 
     return media
 
@@ -154,8 +185,14 @@ def get_all_media(exclude=None, minimum_file_age=None):
     if not exclude:
         exclude = []
 
+    logger.info("Starting to scan media storage for files")
+
     initial_time = time.time()
-    return _get_media_recursive(default_storage, '', exclude, minimum_file_age, initial_time)
+    all_media = _get_media_recursive(default_storage, '', exclude, minimum_file_age, initial_time)
+
+    logger.info("Finished scanning storage. Found %d files", len(all_media))
+
+    return all_media
 
 
 def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial_time):
@@ -197,7 +234,14 @@ def get_unused_media(exclude=None, minimum_file_age=None):
     all_media = get_all_media(exclude, minimum_file_age)
     used_media = get_used_media()
 
-    return all_media - used_media
+    unused = all_media - used_media
+
+    logger.info(
+        "Analysis complete: %d total files, %d used files, %d unused files",
+        len(all_media), len(used_media), len(unused),
+    )
+
+    return unused
 
 
 def remove_media(files):
@@ -236,16 +280,16 @@ def get_file_fields():
     """
 
     # get models
-
     all_models = apps.get_models()
 
     # get fields
-
     fields = []
 
     for model in all_models:
         for field in model._meta.get_fields():
             if isinstance(field, models.FileField):
                 fields.append(field)
+
+    logger.info("Detected %d model fields that inherit from FileField", len(fields))
 
     return fields

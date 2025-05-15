@@ -62,7 +62,6 @@ class TestManagementCommand(BaseTestCase):
                 verbosity=2, minimum_file_age=0,
             )
 
-        mock_info.assert_called_once()
         assert mock_info.call_args[0][1] == filename
 
         expect(stdout.getvalue().split('\n')) \
