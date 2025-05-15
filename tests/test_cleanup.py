@@ -1,15 +1,13 @@
-# -*- coding: utf-8 -*-
+from unittest import mock
 
-import mock
 import pytest
-import six
 from django.core.management import call_command
 from django.db import models
 from preggy import expect
 
-from django_unused_media.cleanup import (get_all_media, get_file_fields,
-                                         get_unused_media, get_used_media)
-from django_unused_media.remove import remove_empty_dirs, remove_media
+from django_unused_media.management.commands.cleanup_unused_media import (
+    get_all_media, get_file_fields, get_unused_media, get_used_media,
+    remove_empty_dirs, remove_media)
 
 from .base import BaseTestCase
 from .models import CustomFileldsModel, CustomManagerModel, FileFieldsModel
@@ -196,7 +194,7 @@ class TestCleanup(BaseTestCase):
         self._media_create(u'Тест.txt')
         used_media = get_unused_media()
         expect(used_media).to_be_instance_of(set).to_length(1)
-        expect(next(iter(used_media))).to_be_instance_of(six.text_type)
+        expect(next(iter(used_media))).to_be_instance_of(str)
         expect(next(iter(used_media))).to_equal('Тест.txt')
 
     def test_relative_path(self):

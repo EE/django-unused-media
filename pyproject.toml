@@ -1,0 +1,24 @@
+[project]
+name = "django-unused-media"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django (>=5.2.1,<6.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+flake8-isort = "^6.1.2"
+pytest = "^8.3.5"
+pytest-django = "^4.11.1"
+preggy = "^1.4.4"
+

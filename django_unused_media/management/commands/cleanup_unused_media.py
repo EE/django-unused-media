@@ -1,12 +1,16 @@
-# -*- coding: utf-8 -*-
-
 import logging
+import os
+import re
+import time
 
-import six.moves
+from django.apps import apps
+from django.conf import settings
+from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand
+from django.core.validators import EMPTY_VALUES
+from django.db import models
 
-from django_unused_media.cleanup import get_unused_media
-from django_unused_media.remove import remove_empty_dirs, remove_media
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -96,7 +100,7 @@ class Command(BaseCommand):
 
             question = 'Are you sure you want to remove {} unused files? (y/N)'.format(len(unused_media))
 
-            if six.moves.input(question).upper() != 'Y':
+            if input(question).upper() != 'Y':
                 self.info('Interrupted by user. Exit.')
                 return
 
@@ -116,3 +120,132 @@ class Command(BaseCommand):
             level = logging.DEBUG
         root_logger = logging.getLogger()
         root_logger.setLevel(level)
+
+
+def get_used_media():
+    """
+        Get media which are still used in models
+    """
+
+    media = set()
+
+    for field in get_file_fields():
+        is_null = {
+            '%s__isnull' % field.name: True,
+        }
+        is_empty = {
+            '%s' % field.name: '',
+        }
+
+        for value in field.model._base_manager \
+                .values_list(field.name, flat=True) \
+                .exclude(**is_empty).exclude(**is_null):
+            if value not in EMPTY_VALUES:
+                media.add(value)
+
+    return media
+
+
+def get_all_media(exclude=None, minimum_file_age=None):
+    """
+        Get all media entries from storage
+    """
+
+    if not exclude:
+        exclude = []
+
+    initial_time = time.time()
+    return _get_media_recursive(default_storage, '', exclude, minimum_file_age, initial_time)
+
+
+def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial_time):
+    directories, files = storage.listdir(prefix)
+    media = set()
+
+    for name in files:
+        name = prefix + name
+        for e in pathexclude:
+            if re.match(r'^%s$' % re.escape(e).replace('\\*', '.*'), name):
+                break
+        else:
+            media.add(name)
+
+        if minimum_file_age:
+            file_age = initial_time - storage.get_modified_time(name).timestamp()
+            if file_age < minimum_file_age:
+                media.remove(name)
+
+    for directory in directories:
+        directory = prefix + directory + '/'
+        for e in pathexclude:
+            if re.match(r'^%s$' % re.escape(e).replace('\\*', '.*'), directory):
+                break
+        else:
+            media |= _get_media_recursive(storage, directory, pathexclude, minimum_file_age, initial_time)
+
+    return media
+
+
+def get_unused_media(exclude=None, minimum_file_age=None):
+    """
+        Get media which are not used in models
+    """
+
+    if not exclude:
+        exclude = []
+
+    all_media = get_all_media(exclude, minimum_file_age)
+    used_media = get_used_media()
+
+    return all_media - used_media
+
+
+def remove_media(files):
+    """
+        Delete file from media dir
+    """
+    for filename in files:
+        logger.info('Removing %s', filename)
+        default_storage.delete(filename)
+
+
+def remove_empty_dirs(path=None):
+    """
+        Recursively delete empty directories; return True if everything was deleted.
+    """
+
+    if not path:
+        path = settings.MEDIA_ROOT
+
+    if not os.path.isdir(path):
+        return False
+
+    listdir = [os.path.join(path, filename) for filename in os.listdir(path)]
+
+    if all(list(map(remove_empty_dirs, listdir))):
+        logger.info('Removing empty dir %s', path)
+        os.rmdir(path)
+        return True
+    else:
+        return False
+
+
+def get_file_fields():
+    """
+        Get all fields which are inherited from FileField
+    """
+
+    # get models
+
+    all_models = apps.get_models()
+
+    # get fields
+
+    fields = []
+
+    for model in all_models:
+        for field in model._meta.get_fields():
+            if isinstance(field, models.FileField):
+                fields.append(field)
+
+    return fields

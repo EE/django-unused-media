@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
+import io
+from unittest import mock
 
-import mock
-import six
 from django.core.management import call_command
 from preggy import expect
 
@@ -13,7 +12,7 @@ class TestManagementCommand(BaseTestCase):
         expect(call_command('cleanup_unused_media', interactive=False, minimum_file_age=0)).Not.to_be_an_error()
 
     def test_command_nothing_to_delete(self):
-        stdout = six.StringIO()
+        stdout = io.StringIO()
         call_command('cleanup_unused_media', interactive=False, stdout=stdout, minimum_file_age=0)
         expect(stdout.getvalue().split('\n'))\
             .to_include(u'Nothing to delete. Exit')
@@ -21,41 +20,41 @@ class TestManagementCommand(BaseTestCase):
     def test_command_not_interactive(self):
         self._media_create('file.txt')
 
-        stdout = six.StringIO()
+        stdout = io.StringIO()
         call_command('cleanup_unused_media', interactive=False, stdout=stdout, minimum_file_age=0)
         expect(stdout.getvalue().split('\n'))\
             .to_include(u'Done. Total files removed: 1')
 
         expect(self._media_exists('file.txt')).to_be_false()
 
-    @mock.patch('six.moves.input', return_value='n')
-    def test_command_interactive_n(self, mock_input):
+    @mock.patch('sys.stdin', io.StringIO('n'))
+    def test_command_interactive_n(self):
         self._media_create(u'file.txt')
 
-        stdout = six.StringIO()
+        stdout = io.StringIO()
         call_command('cleanup_unused_media', interactive=True, stdout=stdout, minimum_file_age=0)
         expect(stdout.getvalue().split('\n'))\
             .to_include(u'Interrupted by user. Exit.')
 
         expect(self._media_exists(u'file.txt')).to_be_true()
 
-    @mock.patch('six.moves.input', return_value='Y')
-    def test_command_interactive_y(self, mock_input):
+    @mock.patch('sys.stdin', io.StringIO('Y'))
+    def test_command_interactive_y(self):
         self._media_create(u'file.txt')
 
-        stdout = six.StringIO()
+        stdout = io.StringIO()
         call_command('cleanup_unused_media', interactive=True, stdout=stdout, minimum_file_age=0)
         expect(stdout.getvalue().split('\n')) \
             .to_include(u'Done. Total files removed: 1')
 
         expect(self._media_exists(u'file.txt')).to_be_false()
 
-    @mock.patch('six.moves.input', return_value='Y')
-    def test_command_interactive_y_with_ascii(self, mock_input):
+    @mock.patch('sys.stdin', io.StringIO('Y'))
+    def test_command_interactive_y_with_ascii(self):
         filename = 'Тест.txt'
         self._media_create(filename)
 
-        stdout = six.StringIO()
+        stdout = io.StringIO()
         with mock.patch('logging.Logger.info') as mock_info:
             call_command(
                 'cleanup_unused_media',
@@ -90,7 +89,7 @@ class TestManagementCommand(BaseTestCase):
     def test_command_dry_run(self):
         self._media_create('file.txt')
 
-        stdout = six.StringIO()
+        stdout = io.StringIO()
         call_command('cleanup_unused_media', interactive=False, dry_run=True, stdout=stdout, minimum_file_age=0)
         expect(stdout.getvalue().split('\n')) \
             .to_include(u'Total files will be removed: 1') \
@@ -98,11 +97,11 @@ class TestManagementCommand(BaseTestCase):
 
         expect(self._media_exists('file.txt')).to_be_true()
 
-    @mock.patch('six.moves.input', return_value='Y')
-    def test_command_interactive_silent(self, mock_input):
+    @mock.patch('sys.stdin', io.StringIO('Y'))
+    def test_command_interactive_silent(self):
         self._media_create(u'file.txt')
 
-        stdout = six.StringIO()
+        stdout = io.StringIO()
         call_command('cleanup_unused_media', interactive=True, stdout=stdout, verbosity=0, minimum_file_age=0)
         expect(stdout.getvalue().split('\n')) \
             .Not.to_include(u'Files to remove:') \
@@ -111,11 +110,10 @@ class TestManagementCommand(BaseTestCase):
 
         expect(self._media_exists(u'file.txt')).to_be_false()
 
-    @mock.patch('six.moves.input', return_value='Y')
-    def test_command_noninteractive_silent(self, mock_input):
+    def test_command_noninteractive_silent(self):
         self._media_create(u'file.txt')
 
-        stdout = six.StringIO()
+        stdout = io.StringIO()
         call_command('cleanup_unused_media', interactive=False, stdout=stdout, verbosity=0, minimum_file_age=0)
         expect(stdout.getvalue()).to_equal('')
         expect(self._media_exists(u'file.txt')).to_be_false()
