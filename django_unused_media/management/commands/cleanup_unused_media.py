@@ -228,7 +228,7 @@ def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial
             media |= _get_media_recursive(storage, directory, pathexclude, minimum_file_age, initial_time)
             len_after = len(media)
             if len_after // REPORT_EVERY_N_FILES > len_before // REPORT_EVERY_N_FILES:
-                logger.info("Prefix %s has %d flat and nested files so far", directory, len_after)
+                logger.info("Prefix %s has %d flat and nested files so far", prefix, len_after)
 
     return media
 
