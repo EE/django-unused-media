@@ -245,10 +245,11 @@ def get_unused_media(exclude=None, minimum_file_age=None):
     used_media = get_used_media()
 
     unused = all_media - used_media
+    missing = used_media - all_media
 
     logger.info(
-        "Analysis complete: %d total files, %d used files, %d unused files",
-        len(all_media), len(used_media), len(unused),
+        "Analysis complete: %d total files, %d used files, %d unused files, %d missing files",
+        len(all_media), len(used_media), len(unused), len(missing),
     )
 
     return unused
