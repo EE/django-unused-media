@@ -1,6 +1,7 @@
 from unittest import mock
 
 import pytest
+from django.core.files.storage import default_storage
 from django.core.management import call_command
 from django.db import models
 from preggy import expect
@@ -126,16 +127,24 @@ class TestCleanup(BaseTestCase):
             .Not.to_include('exclude_dir/file1.txt')\
             .Not.to_include('exclude_dir/file2.txt')
 
-    def test_get_all_media_with_minimum_file_age(self):
+    def test_get_unused_media_with_minimum_file_age(self):
         self._media_create(u'fresh_file.txt')
-        expect(get_all_media(minimum_file_age=60)) \
+        expect(get_unused_media(minimum_file_age=60)) \
             .to_be_instance_of(set).to_length(0)
 
-    def test_get_all_media_with_minimum_file_age_2(self):
+    def test_get_unused_media_with_minimum_file_age_2(self):
         self._media_create(u'fresh_file.txt', file_age=70)
-        expect(get_all_media(minimum_file_age=60)) \
+        expect(get_unused_media(minimum_file_age=60)) \
             .to_be_instance_of(set).to_length(1) \
             .to_include('fresh_file.txt')
+
+    def test_get_unused_media_checks_age_of_unused_files_only(self):
+        self._media_create(u'notused.txt', file_age=70)
+        with mock.patch.object(
+            default_storage, 'get_modified_time', wraps=default_storage.get_modified_time,
+        ) as get_modified_time:
+            expect(get_unused_media(minimum_file_age=60)).to_equal({'notused.txt'})
+        get_modified_time.assert_called_once_with('notused.txt')
 
     @pytest.mark.skip(reason="TODO")
     @mock.patch('django_unused_media.cleanup.os.path.abspath', side_effect=win_os_abspath)

@@ -80,6 +80,9 @@ Verbosity level.
 - 1 - normal output (default)
 - 2 - verbose output (list individual files)
 
+Progress of the scan goes to the `django_unused_media` logger at `INFO`,
+so it shows wherever the project's `LOGGING` sends that logger.
+
 
 # Tests
 At first make sure that you are in virtualenv if you use it.

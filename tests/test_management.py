@@ -1,6 +1,9 @@
 import io
+import logging
 from unittest import mock
 
+import pytest
+from django.core.files.storage import default_storage
 from django.core.management import call_command
 from preggy import expect
 
@@ -55,14 +58,7 @@ class TestManagementCommand(BaseTestCase):
         self._media_create(filename)
 
         stdout = io.StringIO()
-        with mock.patch('logging.Logger.info') as mock_info:
-            call_command(
-                'cleanup_unused_media',
-                interactive=True, stdout=stdout,
-                verbosity=2, minimum_file_age=0,
-            )
-
-        assert mock_info.call_args[0][1] == filename
+        call_command('cleanup_unused_media', interactive=True, stdout=stdout, minimum_file_age=0)
 
         expect(stdout.getvalue().split('\n')) \
             .to_include(u'Done. Total files removed: 1')
@@ -116,3 +112,17 @@ class TestManagementCommand(BaseTestCase):
         call_command('cleanup_unused_media', interactive=False, stdout=stdout, verbosity=0, minimum_file_age=0)
         expect(stdout.getvalue()).to_equal('')
         expect(self._media_exists(u'file.txt')).to_be_false()
+
+
+@pytest.mark.django_db
+def test_command_leaves_logging_configuration_alone(caplog):
+    def listdir(path):
+        logging.getLogger('storage_library').debug('signed request')
+        return [], []
+
+    stdout = io.StringIO()
+    with mock.patch.object(default_storage, 'listdir', listdir):
+        call_command('cleanup_unused_media', interactive=False, verbosity=2, stdout=stdout)
+
+    assert stdout.getvalue() == 'Nothing to delete. Exit\n'
+    assert 'signed request' not in caplog.text

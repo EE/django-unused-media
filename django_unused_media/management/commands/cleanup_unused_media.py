@@ -17,13 +17,6 @@ class Command(BaseCommand):
 
     help = "Clean unused media files which have no reference in models"
 
-    # verbosity
-    # 0 means silent
-    # 1 means normal output (default).
-    # 2 means verbose output
-
-    verbosity = 1
-
     def add_arguments(self, parser):
 
         parser.add_argument('--noinput', '--no-input',
@@ -56,28 +49,8 @@ class Command(BaseCommand):
                             default=False,
                             help='Dry run without any affect on your data')
 
-    def info(self, message):
-        if self.verbosity > 0:
-            self.stdout.write(message)
-
-    def debug(self, message):
-        if self.verbosity > 1:
-            self.stdout.write(message)
-
-    def _show_files_to_delete(self, unused_media):
-        self.debug('Files to remove:')
-
-        for f in unused_media:
-            self.debug(f)
-
-        self.info('Total files will be removed: {}'.format(len(unused_media)))
-
     def handle(self, *args, **options):
-
-        if 'verbosity' in options:
-            self.verbosity = options['verbosity']
-
-        self._configure_logging()
+        self.verbosity = options['verbosity']
 
         unused_media = get_unused_media(
             exclude=options.get('exclude'),
@@ -85,23 +58,20 @@ class Command(BaseCommand):
         )
 
         if not unused_media:
-            self.info('Nothing to delete. Exit')
+            self._report('Nothing to delete. Exit')
             return
 
+        self._report('Files to remove:\n' + '\n'.join(sorted(unused_media)), verbosity=2)
+        self._report('Total files will be removed: {}'.format(len(unused_media)))
+
         if options.get('dry_run'):
-            self._show_files_to_delete(unused_media)
-            self.info('Dry run. Exit.')
+            self._report('Dry run. Exit.')
             return
 
         if options.get('interactive'):
-            self._show_files_to_delete(unused_media)
-
-            # ask user
-
             question = 'Are you sure you want to remove {} unused files? (y/N)'.format(len(unused_media))
-
             if input(question).upper() != 'Y':
-                self.info('Interrupted by user. Exit.')
+                self._report('Interrupted by user. Exit.')
                 return
 
         remove_media(unused_media)
@@ -109,30 +79,11 @@ class Command(BaseCommand):
         if options.get('remove_empty_dirs'):
             remove_empty_dirs()
 
-        self.info('Done. Total files removed: {}'.format(len(unused_media)))
+        self._report('Done. Total files removed: {}'.format(len(unused_media)))
 
-    def _configure_logging(self):
-        if self.verbosity == 0:
-            level = logging.ERROR
-        elif self.verbosity == 1:
-            level = logging.INFO
-        else:
-            level = logging.DEBUG
-
-        # Configure root logger
-        root_logger = logging.getLogger()
-        root_logger.setLevel(level)
-
-        # Ensure we have a console handler for immediate feedback
-        if not root_logger.handlers:
-            console_handler = logging.StreamHandler(self.stdout)
-            console_handler.setLevel(level)
-            formatter = logging.Formatter('%(message)s')  # Simple format for console output
-            console_handler.setFormatter(formatter)
-            root_logger.addHandler(console_handler)
-
-        # Set our module logger level too
-        logger.setLevel(level)
+    def _report(self, message, verbosity=1):
+        if self.verbosity >= verbosity:
+            self.stdout.write(message)
 
 
 def get_used_media():
@@ -177,7 +128,7 @@ def get_used_media():
     return media
 
 
-def get_all_media(exclude=None, minimum_file_age=None):
+def get_all_media(exclude=None):
     """
         Get all media entries from storage
     """
@@ -187,8 +138,7 @@ def get_all_media(exclude=None, minimum_file_age=None):
 
     logger.info("Starting to scan media storage for files")
 
-    initial_time = time.time()
-    all_media = _get_media_recursive(default_storage, '', exclude, minimum_file_age, initial_time)
+    all_media = _get_media_recursive(default_storage, '', exclude)
 
     logger.info("Finished scanning storage. Found %d files", len(all_media))
 
@@ -198,7 +148,7 @@ def get_all_media(exclude=None, minimum_file_age=None):
 REPORT_EVERY_N_FILES = 1000
 
 
-def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial_time):
+def _get_media_recursive(storage, prefix, pathexclude):
     directories, files = storage.listdir(prefix)
     media = set()
 
@@ -209,14 +159,8 @@ def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial
                 break
         else:
             media.add(name)
-
-        if minimum_file_age:
-            file_age = initial_time - storage.get_modified_time(name).timestamp()
-            if file_age < minimum_file_age:
-                media.remove(name)
-
-        if len(media) % REPORT_EVERY_N_FILES == 0:
-            logger.info("Prefix %s has %d flat files so far", prefix, len(media))
+            if len(media) % REPORT_EVERY_N_FILES == 0:
+                logger.info("Prefix %s has %d flat files so far", prefix, len(media))
 
     for directory in directories:
         directory = prefix + directory + '/'
@@ -225,7 +169,7 @@ def _get_media_recursive(storage, prefix, pathexclude, minimum_file_age, initial
                 break
         else:
             len_before = len(media)
-            media |= _get_media_recursive(storage, directory, pathexclude, minimum_file_age, initial_time)
+            media |= _get_media_recursive(storage, directory, pathexclude)
             len_after = len(media)
             if len_after // REPORT_EVERY_N_FILES > len_before // REPORT_EVERY_N_FILES:
                 logger.info("Prefix %s has %d flat and nested files so far", prefix, len_after)
@@ -241,7 +185,10 @@ def get_unused_media(exclude=None, minimum_file_age=None):
     if not exclude:
         exclude = []
 
-    all_media = get_all_media(exclude, minimum_file_age)
+    all_media = get_all_media(exclude)
+    # A file uploaded just before the references are read may belong to a row
+    # whose transaction has not committed yet, so file ages count back from this moment.
+    references_read_at = time.time()
     used_media = get_used_media()
 
     unused = all_media - used_media
@@ -251,6 +198,16 @@ def get_unused_media(exclude=None, minimum_file_age=None):
         "Analysis complete: %d total files, %d used files, %d unused files, %d missing files",
         len(all_media), len(used_media), len(unused), len(missing),
     )
+
+    if minimum_file_age:
+        # Only the unused files are checked:
+        # on remote storage each check is a request of its own.
+        logger.info("Checking age of %d unused files", len(unused))
+        unused = {
+            name for name in unused
+            if references_read_at - default_storage.get_modified_time(name).timestamp() >= minimum_file_age
+        }
+        logger.info("%d unused files are at least %d s old", len(unused), minimum_file_age)
 
     return unused
 
